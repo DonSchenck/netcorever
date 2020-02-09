@@ -13,6 +13,7 @@ namespace netcorever
         private static int _projectCount = 0;
         private static int _coreCount = 0;
         private static int _frameworkCount = 0;
+        private static int _multipleCount = 0;
         private static int _noFrameworkFoundCount = 0;
 
         static void Main(string[] args)
@@ -28,7 +29,6 @@ namespace netcorever
 
                 // TODO: The following code (which determines the starting path) should optionally use a command-line option
                 string path = Directory.GetCurrentDirectory();
-
                 ReportOnCurrentDirectory(path, "csproj");
             } catch (Exception e) {
                 Console.WriteLine(e.Message);
@@ -36,6 +36,7 @@ namespace netcorever
                 Console.WriteLine("{0} project(s) found.",_projectCount);
                 Console.WriteLine("{0} .NET Core project(s) found",_coreCount);
                 Console.WriteLine("{0} .NET Framework project(s) found",_frameworkCount);
+                Console.WriteLine("{0} .NET Multi-framework project(s) found",_multipleCount);
                 if (_noFrameworkFoundCount > 0) Console.WriteLine("{0} project(s) had No Framework found",_noFrameworkFoundCount);
             }
         }
@@ -60,31 +61,37 @@ namespace netcorever
             string version = "No Target Framework found";
 
             _projectCount++;
-
-            XmlDocument doc = new XmlDocument();
-            doc.Load(projectFileName);
-
             string coreVersion = null;
+            string multipleVersions = null;
             string frameworkVersion = null;
-            XmlElement element;
 
-            element = doc.GetElementById("TargetFramework");
-            if (element != null) coreVersion = element.Value;
+            XmlDocument xmldoc = new XmlDocument();
+            xmldoc.Load(projectFileName);
+            XmlNamespaceManager mgr = new XmlNamespaceManager(xmldoc.NameTable);
+            mgr.AddNamespace("x", "http://schemas.microsoft.com/developer/msbuild/2003");
 
-            element = doc.GetElementById("TargetFrameworkVersion");
-            if (element != null) frameworkVersion = element.Value;
-
-            if (coreVersion != null)
+            foreach (XmlNode item in xmldoc.GetElementsByTagName("TargetFramework"))
             {
-                _coreCount++;
+                coreVersion = item.InnerText.ToString();
                 version = coreVersion;
-            } 
-            if (frameworkVersion != null)
+                _coreCount++;
+            }
+
+            foreach (XmlNode item in xmldoc.GetElementsByTagName("TargetFrameworks"))
             {
+                multipleVersions = item.InnerText.ToString();
+                version = multipleVersions;
+                _multipleCount++;
+            }
+
+            foreach (XmlNode item in xmldoc.GetElementsByTagName("TargetFrameworkVersion"))
+            {
+                frameworkVersion = item.InnerText.ToString();
                 version = frameworkVersion;
                 _frameworkCount++;
-            } 
-            if (coreVersion == null && frameworkVersion == null) _noFrameworkFoundCount++;
+            }
+
+            if (coreVersion == null && frameworkVersion == null && multipleVersions == null) _noFrameworkFoundCount++;
 
             return version;
         }
